@@ -420,7 +420,7 @@ def _caption_words(job, clip, words, off):
     return [dict(w, s=w["s"] - off, e=w["e"] - off) for w in roman.words(raw)]
 
 
-CLIP_MINUTES = float(config.env("PEAKCUT_CLIP_MINUTES", "15"))     # the longest one clip may take to make
+CLIP_MINUTES = float(config.env("CUTCUT_CLIP_MINUTES", "15"))     # the longest one clip may take to make
 
 
 def _wait_for_clips(job, futures, began, workers):

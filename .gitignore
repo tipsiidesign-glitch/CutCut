@@ -20,7 +20,6 @@ storage.json
 CLAUDE.local.md
 .vscode/
 .idea/
-*.bat
 Thumbs.db
 .DS_Store
 
@@ -30,3 +29,26 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+# CutCut local generated files
+cache/
+downloads/
+temp/
+data/*
+!data/.gitkeep
+# Local dependencies and environments
+node_modules/
+venv/
+.venv/
+# Temporary files
+*.tmp
+*.log
+
+
+# Local runtime
+runtime/
+
+# Ollama private data
+.ollama/
+id_ed25519
+id_ed25519.pub
+CutCut-Code-Review.txt

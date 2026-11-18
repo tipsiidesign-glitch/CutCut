@@ -1,0 +1,6 @@
+$ErrorActionPreference="Stop"
+$r=$PSScriptRoot; $env:TEMP="$r\temp"; $env:TMP=$env:TEMP; $env:PIP_CACHE_DIR="$r\cache\pip"
+New-Item -ItemType Directory -Force -Path $env:TEMP,$env:PIP_CACHE_DIR,"$r\downloads","$r\runtime\python" | Out-Null
+$py="$r\runtime\python\python.exe"; if (!(Test-Path $py)) { Invoke-WebRequest 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip' -OutFile "$r\downloads\python.zip"; Expand-Archive "$r\downloads\python.zip" "$r\runtime\python" -Force; @('python311.zip','.','Lib\site-packages','..\..','import site') | Set-Content "$r\runtime\python\python311._pth"; New-Item -ItemType Directory -Force "$r\runtime\python\Lib\site-packages" | Out-Null; Invoke-WebRequest 'https://bootstrap.pypa.io/get-pip.py' -OutFile "$r\downloads\get-pip.py"; & $py "$r\downloads\get-pip.py" }
+$env:CUTCUT_DATA="$r\data"; $env:CUTCUT_MODELS="$r\data\models"; $env:CUTCUT_FFMPEG_DIR='D:\ffmpeg-9.0.2-essentials_build\ffmpeg-9.0.2-essentials_build\bin'; if (!(Test-Path $env:CUTCUT_FFMPEG_DIR)) { throw 'FFmpeg not found on D:.' }
+& $py -m pip install -r "$r\requirements.txt"; if ($LASTEXITCODE) { throw 'Python dependencies failed.' }; New-Item -ItemType Directory -Force "$r\data\logs" | Out-Null; Write-Host 'Setup complete. Run Start-Instant.bat.' -ForegroundColor Green

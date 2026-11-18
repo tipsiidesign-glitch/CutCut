@@ -3,7 +3,7 @@ post carries.
 
 Runs against the code directly, with its own empty data folder."""
 import os, sys, tempfile
-os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-games-")
+os.environ["CUTCUT_DATA"] = tempfile.mkdtemp(prefix="pc-games-")
 sys.path.insert(0, ".")
 from studio import brain, games, live
 fails = []

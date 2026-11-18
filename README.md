@@ -1,205 +1,125 @@
-# PeakCut
+# CutCut
 
-Turn long videos and live streams into captioned vertical clips, ready to post. Free and open source: run it on
-your own computer or server, with your own AI key.
-
-Paste a YouTube, Twitch or Kick link (or upload a file) and PeakCut finds the moments worth clipping, cuts them to
-9:16, adds word-by-word captions and a hook, and can post them to your connected accounts. It can also record a
-creator's live stream and clip the highlights while the stream is still running.
+CutCut turns long videos and live streams into short, vertical clips. It runs as a local web app on your Windows PC, with local speech recognition and optional AI-assisted clip selection.
 
 ## What it does
 
-- **Clips from any video.** Transcribes the audio, asks an AI which moments would hold a stranger's attention, and
-  renders each one with captions in one of three styles.
-- **Live clipping.** Records a stream into a rolling buffer and clips as it happens, using loudness, chat activity
-  and the transcript.
-- **Workspaces per creator.** Channels, clip settings, posting rules and an activity log for each creator you clip.
-- **Posting.** Connect YouTube, Instagram and TikTok in one click, then queue or auto-post finished clips, with
-  spacing and daily caps (see [DEPLOY.md](DEPLOY.md#connecting-youtube-instagram-and-tiktok) for the one-time setup).
-- **No sign-in on your own computer.** It opens straight into the dashboard. On a shared server, switch accounts on
-  (`PEAKCUT_ACCOUNTS=1`) for email or Google sign-in and an admin dashboard.
-- **Your own AI.** Gemini, OpenAI, Grok, Groq, OpenRouter, Claude, a local model through Ollama, or anything that
-  speaks the OpenAI chat format. No key at all also works: clips are then picked by loudness.
+- Import a local video or a video link from a supported source: YouTube, Twitch, or Kick.
+- Record supported live creator channels and make clips from the stream.
+- Transcribe speech locally with Sherpa-ONNX and the Parakeet model.
+- Use an AI provider to help select moments and write clip hooks, titles, descriptions, and hashtags. Without a configured AI provider, video clip selection can fall back to loudness-based picks.
+- Render vertical clips with captions, selectable layout and caption styles, and adjustable clip length and output quality.
+- Optionally connect YouTube, Instagram, or TikTok accounts for manual posting or creator-configured automatic posting. Platform developer apps and account authorization are required.
 
-## Quick start
+CutCut uses FFmpeg for media processing. It does not bundle FFmpeg or the speech model; the model is downloaded on first launch when needed.
 
-You need Python 3.10 or newer and `ffmpeg`. On Windows: `winget install Gyan.FFmpeg`. On a Mac: `brew install ffmpeg`.
-On Linux: `sudo apt install ffmpeg`. PeakCut finds it by itself and tells you in the dashboard if it is missing.
+## AI providers
 
-Put PeakCut in a short folder that stays put: `C:\peakcut` on Windows, `~/peakcut` on a Mac or Linux. Not inside a
-temporary folder or an AI assistant's workspace: those get cleaned up, and on Windows a folder that deep stops the
-speech model from loading (Windows can't open files whose full path is over 260 characters). If an AI assistant
-installs it for you, it should ask you where to put it first ([AGENTS.md](AGENTS.md) tells it to).
+CutCut supports these providers in **Settings → AI**:
 
-On Windows:
-
-```bash
-git clone <this repository> C:\peakcut
-```
-
-```bash
-cd C:\peakcut
-```
-
-On a Mac or Linux:
-
-```bash
-git clone <this repository> ~/peakcut
-```
-
-```bash
-cd ~/peakcut
-```
-
-```bash
-pip install -r requirements.txt
-```
-
-Start the server:
-
-```bash
-python -m studio.server
-```
-
-The first start downloads the speech model by itself (about 480 MB, once).
-
-Open http://127.0.0.1:8765. There is no sign-in: it opens straight into the dashboard. Go to **Settings, AI**, choose
-your AI service, paste your key and press **Save and test** (see [Choose your AI](#choose-your-ai)).
-
-## Choose your AI
-
-PeakCut needs a chat model that can return JSON. The easy way is in the dashboard: **Settings, AI**. Pick the
-service, paste your key, press **Find models** to choose from the service's own list, then **Save and test**. The
-key is kept in the data folder on your machine and is never shown again.
-
-If you prefer a file (or run a server), the same three things can go in `.env`. What is saved in the dashboard wins:
-
-```ini
-PEAKCUT_AI_PROVIDER=gemini
-PEAKCUT_AI_MODELS=gemini-2.5-flash
-PEAKCUT_AI_KEY=your-key-here
-```
-
-| `PEAKCUT_AI_PROVIDER` | Service | Where to get a key |
+| Provider | Provider ID | Example model |
 |---|---|---|
-| `gemini` | Google Gemini | https://aistudio.google.com/apikey |
-| `openai` | OpenAI | https://platform.openai.com/api-keys |
-| `xai` | Grok (xAI) | https://console.x.ai |
-| `groq` | Groq | https://console.groq.com/keys |
-| `openrouter` | OpenRouter (many models, one key) | https://openrouter.ai/keys |
-| `anthropic` | Claude | https://console.anthropic.com |
-| `ollama` | A model on your own machine, no key | https://ollama.com |
-| `custom` | Any OpenAI-compatible address: also set `PEAKCUT_AI_BASE_URL` | |
+| Google Gemini | `gemini` | `gemini-2.5-flash` |
+| OpenAI | `openai` | `gpt-4o-mini` |
+| xAI / Grok | `xai` | `grok-4` |
+| Groq | `groq` | `llama-3.3-70b-versatile` |
+| OpenRouter | `openrouter` | `google/gemini-2.5-flash` |
+| Anthropic / Claude | `anthropic` | Choose an available model in Settings |
+| Custom OpenAI-compatible API | `custom` | Set the model and API base URL |
 
-- `PEAKCUT_AI_MODELS` is the model id exactly as the service names it. Model names change often, so check the
-  service's current list. Several ids separated by commas are tried in order, which gives you a fallback.
-- A fast, inexpensive model is the right choice. A one-hour video is read in about four requests.
-- You pay the AI service directly for what you use. The **AI usage** page in the app shows how many requests and
-  tokens each video took.
-- Speech to text does not use the AI service. It runs on your own machine, so audio never leaves it.
+The default provider is Gemini and the default model is `gemini-2.5-flash`. Model availability and pricing are controlled by each provider.
 
-## Settings
+### Configure Gemini
 
-Everything is set through environment variables, normally in a `.env` file next to this README.
-[`.env.example`](.env.example) lists every setting with a short explanation. The ones that matter first:
+1. Start CutCut and open **Settings → AI**.
+2. Select **Gemini**, enter the model `gemini-2.5-flash`, and add your Google AI Studio API key.
+3. Save the settings and use the provider test in the AI settings page.
 
-| Setting | What it is for |
-|---|---|
-| `PEAKCUT_AI_PROVIDER`, `PEAKCUT_AI_MODELS`, `PEAKCUT_AI_KEY` | The AI that picks clips and writes titles (or set it in the dashboard) |
-| `PEAKCUT_ACCOUNTS` | `1` makes everyone sign in. Use it on any server other people can reach |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional: Sign in with Google, and connecting YouTube |
-| `PEAKCUT_SMTP_*`, `PEAKCUT_MAIL_FROM` | Optional: confirmation and password emails |
-| `PEAKCUT_DATA` | Where videos, clips and the database are kept (default `./data`) |
+Alternatively, copy `.env.example` to `.env` and set the relevant values:
 
-`.env`, the `secrets/` folder and all user data are ignored by git. Keep keys there, never in the code.
-
-## Admins
-
-This only matters with accounts switched on (`PEAKCUT_ACCOUNTS=1`); without them you are the owner and can do
-everything. An account is an admin only when the database says so. No email address is special in the code and no web request
-can change a role. Do it on the machine that runs PeakCut:
-
-```bash
-python -m studio.admin grant you@example.com
+```dotenv
+CUTCUT_AI_PROVIDER=gemini
+CUTCUT_AI_MODELS=gemini-2.5-flash
+CUTCUT_AI_KEY=your-gemini-api-key
 ```
 
-`revoke` and `list` work the same way. The admin dashboard is at `/admin` and answers "not found" to everyone else.
+The dashboard's saved provider settings take precedence over `.env`. `.env` and `data/ai.json` are local configuration and are excluded from Git; never commit real keys.
 
-## How it is built
+## Technology
 
-| Part | What it is |
-|---|---|
-| `studio/` | The server: FastAPI, the clip pipeline, live recording, accounts |
-| `studio/ai.py` | The only file that talks to an AI service. Add a provider here |
-| `web/` | The pages: landing, sign-in, the app, the admin dashboard (plain HTML, CSS and JavaScript, no build step) |
-| `tests/` | Tests that run against a throwaway copy of the app |
-| `deploy/`, `Dockerfile`, `docker-compose.yml` | One-server deployment with PostgreSQL and automatic HTTPS |
+- Python 3.11, FastAPI, and Uvicorn
+- SQLAlchemy with SQLite for the local setup; PostgreSQL is supported for the documented Docker deployment
+- Sherpa-ONNX and Parakeet for speech recognition
+- FFmpeg for video and audio processing
+- yt-dlp for supported online media sources
+- NumPy, SoundFile, and Pillow
+- HTML, CSS, and JavaScript frontend
 
-Video work is done with `ffmpeg` and `yt-dlp`. Speech is transcribed with `sherpa-onnx` and the Parakeet model.
-Data is kept per user: accounts in the database (SQLite on your own computer, PostgreSQL on a server), videos and
-clips in each user's own folder. [AGENTS.md](AGENTS.md) is a short map of the code for contributors and AI coding
-assistants.
+## Windows installation
 
-## Where your videos and clips are kept
+### Requirements
 
-Everything PeakCut keeps is in one folder: videos, clips, recordings, creators, settings and the speech model. By
-default it is the `data` folder inside PeakCut. **Settings, Storage** shows the folder and how much room its drive
-has, opens it in one click, and lets you move it to another drive: choose the new folder, and PeakCut moves
-everything there the next time it starts. If the drive is nearly full, PeakCut says so and stops taking new videos
-until there is room. (`PEAKCUT_DATA` in `.env` still works and takes priority.)
+- 64-bit Windows 10 or Windows 11
+- PowerShell and an internet connection for setup and model downloads
+- FFmpeg with both `ffmpeg.exe` and `ffprobe.exe`
+- Space for the application, speech model, source videos, and rendered clips
 
-## Updating
+The checked-in setup and start scripts currently expect FFmpeg in:
 
-PeakCut checks GitHub once a minute while it runs. When a newer version is out, the dashboard shows a notice
-within a minute or two (no restart needed), with what changed
-and how to update: ask your AI coding assistant to do it (the notice has a sentence to paste), or run
-`git pull && pip install -r requirements.txt` in the PeakCut folder and restart it (with Docker:
-`git pull && docker compose up -d --build`). Your `.env`, keys and clips are not touched. Only the two commit ids
-are sent to GitHub; set `PEAKCUT_UPDATE_CHECK=0` to turn the check off.
-
-## Deploy
-
-[DEPLOY.md](DEPLOY.md) walks through a single server with Docker: the app, PostgreSQL, and Caddy for HTTPS.
-
-```bash
-docker compose up -d --build
+```text
+D:\ffmpeg-9.0.2-essentials_build\ffmpeg-9.0.2-essentials_build\bin
 ```
 
-## How it behaves under load
+If your FFmpeg installation is elsewhere, update the `$env:CUTCUT_FFMPEG_DIR` / `$ff` path in `Setup-Instant.ps1` and `Start-Instant.ps1` before running setup. The scripts do not download or install FFmpeg.
 
-- The page asks the server one small question every few seconds. When nothing has changed, the answer comes
-  straight from memory.
-- Each person's videos wait in their own line and the lines take turns, so one person cannot hold everyone up.
-- The server measures its own processor, memory and disk every second. Extra videos and recordings start only
-  while there is room, wait briefly when it is nearly full, and continue the moment it frees up.
-- There are no limits on upload size, video length, recordings, creators or storage unless you set them in
-  `.env`. Five videos can be sent at once. Request sizes are always capped, so junk can't fill the memory.
+### Install and start
 
-## Tests
+1. Clone the repository and enter its folder:
 
-```bash
-python tests/run.py
+   ```powershell
+   git clone https://github.com/tipsiidesign-glitch/CutCut.git
+   Set-Location CutCut
+   ```
+
+2. Run `Setup-Instant.bat`. It downloads the Python 3.11.9 embeddable runtime if needed, installs pip and the pinned packages in `requirements.txt`, and prepares local folders.
+3. Run `Start-Instant.bat` and leave its PowerShell window open while CutCut is running.
+4. Open [http://127.0.0.1:8765](http://127.0.0.1:8765) in your browser.
+5. Configure an AI provider in **Settings → AI** if you want AI-assisted moment selection and clip text.
+
+The Windows launcher stores application data under `data/` and binds to `127.0.0.1` by default. Press **Ctrl+C** in the running PowerShell window to stop the server. Do not expose this local setup to a public network: local sign-in is disabled by default.
+
+For the Docker-based server deployment, see [DEPLOY.md](DEPLOY.md).
+
+## Project layout
+
+```text
+studio/                 Application server, AI, transcription, media, jobs, and storage
+web/                    Browser interface and brand assets
+tests/                  Application test scripts
+deploy/                 Docker, reverse-proxy, and optional ASR deployment files
+Setup-Instant.*         Windows dependency and runtime setup
+Start-Instant.*         Windows application launcher
+Stop-Instant.*          Reminder to stop the server with Ctrl+C
+requirements.txt        Pinned Python dependencies
+.env.example            Documented environment-variable template
+DEPLOY.md               Docker/server deployment guide
+GAMING.md               Gaming-stream behavior and notes
 ```
 
-This starts a copy of the app on a spare port with an empty temporary data folder, runs the permission, abuse and
-queue tests against it, then removes it. It needs no keys and never touches real data.
+Application data, credentials, downloaded models, runtime binaries, caches, and temporary files are local and are not part of the source tree sent to GitHub.
 
-## Security
+## Troubleshooting
 
-- With sign-in off, PeakCut listens on this computer only (`127.0.0.1`), refuses changes sent by other websites,
-  and only answers to its own address. Do not expose it to the internet that way: turn accounts on.
-- Passwords are stored only as salted scrypt hashes. Sessions are random tokens stored hashed; cookies are HTTP-only.
-- Every route works out who is asking from the session, never from the request, so users only reach their own data.
-- Only known video sites are fetched, and text from videos is treated as data when it is shown to the AI.
-- Found a problem? Please report it privately through the repository's security advisories instead of opening a
-  public issue.
+**Setup says FFmpeg was not found.** Check that both `ffmpeg.exe` and `ffprobe.exe` exist in the path listed above, or update the FFmpeg path in both PowerShell scripts to match your installation.
 
-## Using it responsibly
+**The browser cannot connect.** Keep the PowerShell window open and check that the server started at `http://127.0.0.1:8765`. If another program uses that port, configure `CUTCUT_PORT` before launching the server.
 
-Clip videos you made, or have permission to use. You are responsible for the rights to what you download, clip and
-post, and for following the terms of the sites you fetch from and post to.
+**Speech recognition is not ready on first launch.** The Parakeet model is downloaded when the app starts. Allow the download to finish and check that the data drive has free space and internet access.
 
-## Licence
+**A YouTube link is refused.** YouTube may block automated requests from some networks. Try uploading a local video, or use a supported Twitch or Kick source.
 
-[MIT](LICENSE). Caption fonts in `studio/fonts/` (Anton, Archivo Black, Poppins) are under the SIL Open Font
-License; the licence texts are in the same folder.
+**AI selection is unavailable.** Check the selected provider, model ID, and API key in **Settings → AI**. Provider requests require internet access. The local loudness-based video fallback remains available when AI is not configured.
+
+## Attribution and license
+
+CutCut is based on PeakCut and retains the upstream MIT license and copyright notice. See [LICENSE](LICENSE) for the complete license text.

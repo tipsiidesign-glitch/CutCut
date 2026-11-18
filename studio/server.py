@@ -1,4 +1,4 @@
-"""PeakCut web server. Run with:  python -m studio.server
+"""Instant web server. Run with:  python -m studio.server
 
 Public pages:  /  /login  /signup          The app:  /app  (signed-in users only)
 Everything under /api, /media and /oauth needs a session, except /api/auth/* and /api/public."""
@@ -34,7 +34,7 @@ def _quiet(fn):
         print(f"  {e}", flush=True)
 
 
-app = FastAPI(title="PeakCut", docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="Instant", docs_url=None, redoc_url=None, openapi_url=None)
 WEB = config.ROOT / "web"
 OPEN = ("/api/auth/", "/pub/", "/api/public", "/auth/google/", "/auth/verify", "/brand/", "/assets/", "/healthz", "/favicon.ico", "/robots.txt", "/sitemap.xml")
 PAGES = {"/": "landing.html", "/login": "auth.html", "/signup": "auth.html", "/reset": "reset.html",
@@ -52,7 +52,7 @@ BOOT = f"{int(time.time()) % 100000:x}"     # part of every sync token, so pages
 @app.on_event("startup")
 async def _more_threads():
     import anyio.to_thread
-    anyio.to_thread.current_default_thread_limiter().total_tokens = int(config.env("PEAKCUT_REQUEST_THREADS", "64"))
+    anyio.to_thread.current_default_thread_limiter().total_tokens = int(config.env("CUTCUT_REQUEST_THREADS", "64"))
 
 
 @app.on_event("startup")
@@ -66,14 +66,14 @@ def _startup():
     render.install_fonts()
     if _tools.missing():
         print("\n  " + _tools.HELP + "\n", flush=True)
-    if not transcribe.REMOTE and config.env("PEAKCUT_FETCH_MODEL", "1") != "0":     # the speech model: fetched now, in the background, if it was never downloaded
+    if not transcribe.REMOTE and config.env("CUTCUT_FETCH_MODEL", "1") != "0":     # the speech model: fetched now, in the background, if it was never downloaded
         from . import fetch_model
         threading.Thread(target=lambda: _quiet(fetch_model.ensure), daemon=True).start()
     jobs.start()
     live.start()
     posting.start()
     from . import updates
-    updates.start()                  # looks for a newer PeakCut every minute, in the background
+    updates.start()                  # looks for a newer Instant every minute, in the background
 
 
 # ================================================================ the gate: who is asking, and are they allowed
@@ -131,7 +131,7 @@ class Gate:
             # must have been asked for by its real address (a number, "localhost", or the address in settings),
             # so another website cannot reach it through a made-up name that points at this machine.
             if not _own_address(req.headers.get("host", "")):
-                return await deny(403, "Open PeakCut by its own address.")
+                return await deny(403, "Open Instant by its own address.")
             if path == "/" or path == "/reset" or path.startswith("/auth/"):
                 return await deny(303, "", redirect="/app")
             if path.startswith("/api/auth/") and path != "/api/auth/me":
@@ -152,7 +152,7 @@ class Gate:
         if user and path in ("/login", "/signup"):
             return await deny(303, "", redirect="/app")
         scope.setdefault("state", {})["user"] = user
-        if user and path in ("/api/upload", "/api/upload/start") and method == "POST":
+        if user and path == "/api/upload" and method == "POST":
             # decided before a single byte of the file is accepted: verified, has a free slot, has disk space
             def allowed():
                 with ctx.as_user(user.id):
@@ -227,7 +227,7 @@ class Compress:
 app.add_middleware(Compress)
 
 
-# Cloudflare's published address ranges (cloudflare.com/ips). PEAKCUT_CDN_RANGES replaces them if they ever change.
+# Cloudflare's published address ranges (cloudflare.com/ips). CUTCUT_CDN_RANGES replaces them if they ever change.
 _CDN_RANGES = None
 
 
@@ -235,7 +235,7 @@ def _from_cdn(addr: str) -> bool:
     global _CDN_RANGES
     import ipaddress
     if _CDN_RANGES is None:
-        ranges = config.env("PEAKCUT_CDN_RANGES") or (
+        ranges = config.env("CUTCUT_CDN_RANGES") or (
             "173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 "
             "190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 "
             "104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 "
@@ -250,22 +250,22 @@ def _from_cdn(addr: str) -> bool:
 
 def _ip(request: Request) -> str:
     """The visitor's address, used for rate limits. The connection's own address, or the one the proxy in front
-    reports (PEAKCUT_TRUST_PROXY). If that connection comes from the CDN, the CDN's header names the real visitor
-    (PEAKCUT_CLIENT_IP_HEADER). The header is believed only when the CDN really sent the request, so nobody can
+    reports (CUTCUT_TRUST_PROXY). If that connection comes from the CDN, the CDN's header names the real visitor
+    (CUTCUT_CLIENT_IP_HEADER). The header is believed only when the CDN really sent the request, so nobody can
     pick their own address by sending it themselves.
 
     The proxy adds the address it saw at the END of X-Forwarded-For. Everything before that was written by the
     visitor, so only the last entry is believed."""
     fwd = request.headers.get("x-forwarded-for", "")
-    peer = (fwd.split(",")[-1].strip() if fwd and config.env("PEAKCUT_TRUST_PROXY") else "") or (request.client.host if request.client else "")
-    named = config.env("PEAKCUT_CLIENT_IP_HEADER")
+    peer = (fwd.split(",")[-1].strip() if fwd and config.env("CUTCUT_TRUST_PROXY") else "") or (request.client.host if request.client else "")
+    named = config.env("CUTCUT_CLIENT_IP_HEADER")
     if named and request.headers.get(named) and _from_cdn(peer):
         return request.headers[named].split(",")[0].strip()[:64]
     return peer
 
 
 def _from_here(req, must_say=False) -> bool:
-    """Did this change come from PeakCut's own page, and not from another website?
+    """Did this change come from Instant's own page, and not from another website?
 
     The browser's own answer is trusted first: it marks every request "same-origin" or not, and a web page cannot
     fake that mark. Comparing the page's address with the address the request arrived at is only the fallback,
@@ -280,8 +280,8 @@ def _from_here(req, must_say=False) -> bool:
 
 
 def _own_address(host: str) -> bool:
-    """Is this the address PeakCut is really reached by? A number (127.0.0.1, 192.168.1.20), "localhost", or the
-    host in PEAKCUT_PUBLIC_URL."""
+    """Is this the address Instant is really reached by? A number (127.0.0.1, 192.168.1.20), "localhost", or the
+    host in CUTCUT_PUBLIC_URL."""
     import ipaddress
     name = host.strip().lower()
     name = name[1:name.index("]")] if name.startswith("[") and "]" in name else name.rsplit(":", 1)[0] if ":" in name else name
@@ -364,9 +364,9 @@ def reset_page():
 
 
 LEGAL = {
-    "privacy": ("Privacy Policy", "How PeakCut collects, uses and protects your data, including Google user data, cookies and your privacy rights."),
-    "terms": ("Terms of Service", "The terms for using PeakCut, the AI clipping tool for streams and videos: accounts, availability and liability."),
-    "acceptable-use": ("Acceptable Use Policy", "What you may and may not do with PeakCut, the AI stream clipping tool."),
+    "privacy": ("Privacy Policy", "How Instant collects, uses and protects your data, including Google user data, cookies and your privacy rights."),
+    "terms": ("Terms of Service", "The terms for using Instant, the AI clipping tool for streams and videos: accounts, availability and liability."),
+    "acceptable-use": ("Acceptable Use Policy", "What you may and may not do with Instant, the AI stream clipping tool."),
 }
 
 
@@ -381,9 +381,9 @@ def legal_page(request: Request):
     contact = config.CONTACT_EMAIL
     who = (f'<a href="mailto:{_h.escape(contact)}">{_h.escape(contact)}</a>' if contact
            else "the contact details on our website")
-    name = _h.escape(config.LEGAL_NAME or "PeakCut")
+    name = _h.escape(config.LEGAL_NAME or "Instant")
     law = (f"the laws of {_h.escape(config.LEGAL_COUNTRY)}" if config.LEGAL_COUNTRY
-           else "the laws of the country where PeakCut's operator is established")
+           else "the laws of the country where Instant's operator is established")
     out = (_LEGAL_HTML or (WEB / "legal.html").read_text(encoding="utf-8"))
     for k, v in {"{{CONTACT}}": who, "{{PAGE}}": page, "{{PAGE_PATH}}": page, "{{SITE}}": _h.escape(config.PUBLIC_URL),
                  "{{NAME}}": name, "{{LAW}}": law, "{{TITLE}}": title, "{{DESC}}": desc}.items():
@@ -412,12 +412,12 @@ def admin_page(request: Request, rest: str = ""):
 def healthz():
     with db.engine.connect() as c:
         c.execute(sa.text("select 1"))
-    return {"ok": True}
+    return {"ok": True, "app": "Instant"}
 
 
 @app.get("/brand/{name}")
 def brand(name: str):
-    if not re.fullmatch(r"[\w\-]+\.(svg|png|ico|webp|jpg|mp4)", name) or not (WEB / "brand" / name).is_file():
+    if not re.fullmatch(r"[\w\-]+\.(svg|png|ico|webp|jpg|mp4|css)", name) or not (WEB / "brand" / name).is_file():
         raise HTTPException(404)
     return FileResponse(WEB / "brand" / name, headers={"Cache-Control": "public, max-age=604800, stale-while-revalidate=86400"})
 
@@ -493,7 +493,7 @@ def forgot_password(request: Request, body: dict = Body(...)):
     except auth.AuthError as e:
         raise HTTPException(429, str(e))
     auth.forgot(email)
-    return {"ok": True}   # the same answer whether or not the account exists
+    return {"ok": True, "app": "Instant"}   # the same answer whether or not the account exists
 
 
 @app.post("/api/auth/reset")
@@ -542,7 +542,7 @@ def change_password(request: Request, body: dict = Body(...)):
                              keep_token=request.cookies.get(auth.COOKIE, ""))
     except auth.AuthError as e:
         raise HTTPException(400, str(e))
-    return {"ok": True}
+    return {"ok": True, "app": "Instant"}
 
 
 @app.get("/auth/google/start")
@@ -709,22 +709,29 @@ def link_preview(request: Request, url: str = ""):
 @app.post("/api/jobs")
 def create_from_link(body: dict = Body(...)):
     _need_verified()
-    _quota()
-    _throttle("newjob:" + ctx.uid(), 30, 600)
     url = str(body.get("url", "")).strip()[:500]
     if not media.site_allowed(url):
         raise HTTPException(400, "Paste a full link to a YouTube, Twitch or Kick video.")
     try:
-        media.check_youtube(url)          # YouTube is refusing us right now: say so, rather than queue a job that fails
-    except media.YouTubeBlocked as e:
-        raise HTTPException(503, str(e))
+        options = jobs.clean_options(body.get("options") or {})
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e) if isinstance(e, ValueError) else "Those options aren't valid.")
     creator = str(body.get("creator") or "") or None
     if creator and not creators.get(creator):
         raise HTTPException(404, "No such creator")
+
+    # Reject malformed requests before checking capacity, but keep the disk guard
+    # ahead of network lookups, job creation and any writes.
+    _quota()
+    _throttle("newjob:" + ctx.uid(), 30, 600)
+    try:
+        media.check_youtube(url)          # YouTube is refusing us right now: say so, rather than queue a job that fails
+    except media.YouTubeBlocked as e:
+        raise HTTPException(503, str(e))
     try:
         with _create_lock:
             _job_slots()
-            job = jobs.create({"type": "url", "url": url, "name": url}, body.get("options") or {}, creator=creator)
+            job = jobs.create({"type": "url", "url": url, "name": url}, options, creator=creator)
     except (ValueError, TypeError) as e:
         raise HTTPException(400, str(e) if isinstance(e, ValueError) else "Those options aren't valid.")
     seen = media._PREVIEWS.get(url)  # already looked up while the user was typing: show it straight away
@@ -818,9 +825,6 @@ def _up_get(upid: str) -> dict:
 @app.post("/api/upload/start")
 def upload_start(body: dict = Body(...)):
     _need_verified()
-    _job_slots()
-    _quota()
-    _throttle("upstart:" + ctx.uid(), 30, 600)
     name = re.sub(r"[^\w.\- ]", "_", Path(str(body.get("name") or "video.mp4")).name)[:120]
     ext = Path(name).suffix.lower()
     if ext not in VIDEO_TYPES:
@@ -830,16 +834,19 @@ def upload_start(body: dict = Body(...)):
         raise HTTPException(400, "Bad file size.")
     if size > config.MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(413, f"That file is too big. The limit is {config.MAX_UPLOAD_MB} MB.")
-    if _disk.get(ctx.uid(), (0, 0))[1] + size > config.MAX_USER_GB * 1e9:
-        raise HTTPException(507, "There isn't room for this file in your storage. Delete some older videos to make room.")
     creator = str(body.get("creator") or "")
     if creator and not creators.get(creator):
         raise HTTPException(404, "No such creator")
     opts = body.get("options") if isinstance(body.get("options"), dict) else {}
     try:
-        jobs.clean_options(opts)                 # refused now rather than after the whole file has been sent
+        opts = jobs.clean_options(opts)
     except (ValueError, TypeError):
         raise HTTPException(400, "Those options aren't valid.")
+    _quota()
+    _job_slots()
+    _throttle("upstart:" + ctx.uid(), 30, 600)
+    if _disk.get(ctx.uid(), (0, 0))[1] + size > config.MAX_USER_GB * 1e9:
+        raise HTTPException(507, "There isn't room for this file in your storage. Delete some older videos to make room.")
     _up_sweep()
     mine = 0
     for d in _up_root().glob("up-*"):
@@ -924,7 +931,7 @@ def upload_finish(upid: str):
 def upload_cancel(upid: str):
     _up_get(upid)
     shutil.rmtree(_up_root() / f"up-{upid}", ignore_errors=True)
-    return {"ok": True}
+    return {"ok": True, "app": "Instant"}
 
 
 @app.post("/api/jobs/{jid}/clips/{cid}/render")
@@ -949,7 +956,7 @@ def delete_job(jid: str):
     if job["status"] in ("queued", "running", "live") or jid in live.SESSIONS:
         raise HTTPException(409, "This is still being worked on. Stop it or wait for it to finish first.")
     jobs.delete(jid)
-    return {"ok": True}
+    return {"ok": True, "app": "Instant"}
 
 
 def _pairs(v, limit=300) -> list:
@@ -969,7 +976,7 @@ def delete_clip(jid: str, cid: str):
             raise HTTPException(404, "No such clip")
     except account.Busy as e:
         raise HTTPException(409, str(e))
-    return {"ok": True}
+    return {"ok": True, "app": "Instant"}
 
 
 @app.post("/api/bulk/delete")
@@ -990,7 +997,7 @@ def clips_zip(ids: str = ""):
     except ValueError as e:
         raise HTTPException(400, str(e))
     from starlette.background import BackgroundTask
-    return FileResponse(f, filename=f"peakcut-clips-{len(pairs)}.zip", media_type="application/zip",
+    return FileResponse(f, filename=f"instant-clips-{len(pairs)}.zip", media_type="application/zip",
                         headers={"Cache-Control": "private, no-store"}, background=BackgroundTask(lambda: f.unlink(missing_ok=True)))
 
 
@@ -1054,7 +1061,7 @@ def email_preview(request: Request, kind: str = "verify"):
     from . import mailer
     _admin(request)
     if kind == "reset":
-        page = mailer.preview("Reset your password", "Someone asked to reset the password for this PeakCut account. If that was you, choose a new one below.",
+        page = mailer.preview("Reset your password", "Someone asked to reset the password for this Instant account. If that was you, choose a new one below.",
                               "Choose a new password", config.PUBLIC_URL + "/reset?t=example",
                               "The link works for one hour. If you didn't ask for this, ignore this email and your password stays the same.")
     else:
@@ -1068,10 +1075,10 @@ def test_email(request: Request):
     from . import mailer
     me_ = _admin(request)
     if not mailer.ready():
-        raise HTTPException(400, "No email service is set up yet. Add the PEAKCUT_SMTP settings to .env first.")
-    mailer.send(me_.email, "PeakCut test email", "Your emails are working",
-                "This is a test from your PeakCut server. Account emails like this one will now reach people.",
-                "Open PeakCut", config.PUBLIC_URL + "/app", "You can ignore this message.")
+        raise HTTPException(400, "No email service is set up yet. Add the CUTCUT_SMTP settings to .env first.")
+    mailer.send(me_.email, "Instant test email", "Your emails are working",
+                "This is a test from your Instant server. Account emails like this one will now reach people.",
+                "Open Instant", config.PUBLIC_URL + "/app", "You can ignore this message.")
     return {"sent_to": me_.email}
 
 
@@ -1104,7 +1111,7 @@ def admin_feedback_status(request: Request, fid: int, body: dict = Body(...)):
         feedback.set_status(fid, str(body.get("status", "")))
     except feedback.Refused as e:
         raise HTTPException(400, str(e))
-    return {"ok": True}
+    return {"ok": True, "app": "Instant"}
 
 
 @app.get("/api/notifications")
@@ -1117,7 +1124,7 @@ def notifications_list():
 def notifications_read():
     from . import notices
     notices.read_all()
-    return {"ok": True}
+    return {"ok": True, "app": "Instant"}
 
 
 @app.get("/api/me/photo")
@@ -1225,7 +1232,7 @@ def stop_live(jid: str):
     if not s:
         raise HTTPException(404, "This recording has already ended")
     s.stop()
-    return {"ok": True}
+    return {"ok": True, "app": "Instant"}
 
 
 @app.post("/api/live/{jid}/clip")
@@ -1240,7 +1247,7 @@ def clip_now(jid: str, body: dict = Body(...)):
         s.clip_last(max(5, min(180, float(body.get("seconds", 30)))))
     except (ValueError, TypeError) as e:
         raise HTTPException(400, str(e))
-    return {"ok": True}
+    return {"ok": True, "app": "Instant"}
 
 
 # ================================================================ AI usage
@@ -1329,7 +1336,7 @@ def list_accounts():
 @app.delete("/api/accounts/{aid}")
 def remove_account(aid: str):
     accounts.remove(aid)
-    return {"ok": True}
+    return {"ok": True, "app": "Instant"}
 
 
 # ---------------------------------------------------------------- connecting YouTube, Instagram and TikTok
@@ -1384,11 +1391,11 @@ def public_clip(token: str):
     return FileResponse(f, media_type="video/mp4", headers={"Cache-Control": "private, no-store"})
 
 
-# ---------------------------------------------------------------- where PeakCut keeps everything (Settings, Storage)
+# ---------------------------------------------------------------- where Instant keeps everything (Settings, Storage)
 def _on_this_computer(request: Request) -> bool:
-    """Is the person sitting at the computer PeakCut runs on? Only then can a folder window be opened for them."""
+    """Is the person sitting at the computer Instant runs on? Only then can a folder window be opened for them."""
     host = request.client.host if request.client else ""
-    return host in ("127.0.0.1", "::1", "localhost") and not config.env("PEAKCUT_TRUST_PROXY")
+    return host in ("127.0.0.1", "::1", "localhost") and not config.env("CUTCUT_TRUST_PROXY")
 
 
 @app.get("/api/storage")
@@ -1403,12 +1410,12 @@ def storage_open(request: Request):
     from . import storage
     _admin(request)
     if not _on_this_computer(request):
-        raise HTTPException(400, "The folder can only be opened on the computer PeakCut runs on.")
+        raise HTTPException(400, "The folder can only be opened on the computer Instant runs on.")
     try:
         storage.open_folder()
     except OSError as e:
         raise HTTPException(500, "Couldn't open the folder: " + safe.friendly(e, 200))
-    return {"ok": True}
+    return {"ok": True, "app": "Instant"}
 
 
 @app.post("/api/storage/pick")
@@ -1416,7 +1423,7 @@ def storage_pick(request: Request):
     from . import storage
     _admin(request)
     if not _on_this_computer(request):
-        raise HTTPException(400, "Type the folder's path instead: a folder window can only be shown on the computer PeakCut runs on.")
+        raise HTTPException(400, "Type the folder's path instead: a folder window can only be shown on the computer Instant runs on.")
     return {"path": storage.pick_folder()}
 
 
@@ -1469,7 +1476,7 @@ def post_action(pid: str, action: str):
         raise HTTPException(404)
     except ValueError as e:
         raise HTTPException(400, str(e))
-    return {"ok": True}
+    return {"ok": True, "app": "Instant"}
 
 
 @app.post("/api/alerts/test")
@@ -1483,10 +1490,10 @@ def test_alert():
         auth_problem = str(e)
     if auth_problem:
         raise HTTPException(429, auth_problem)
-    problems = alerts.send("PeakCut: test message. Alerts are working.")
+    problems = alerts.send("Instant: test message. Alerts are working.")
     if problems:
         raise HTTPException(400, "; ".join(problems))
-    return {"ok": True}
+    return {"ok": True, "app": "Instant"}
 
 
 # ================================================================ admin (only accounts marked as admin in the database)
@@ -1537,22 +1544,22 @@ def admin_delete_user(request: Request, uid: str, body: dict = Body(...)):
         raise HTTPException(409, str(e))
     with db.engine.begin() as c:
         admins._log(c, me_.id, "delete", target.id, "account deleted")
-    return {"ok": True}
+    return {"ok": True, "app": "Instant"}
 
 
 def main():
-    print(f"\n  PeakCut is running:  {config.PUBLIC_URL}\n")
+    print(f"\n  Instant is running:  {config.PUBLIC_URL}\n")
     if not config.ACCOUNTS and (config.HTTPS or config.HOST not in ("127.0.0.1", "localhost", "::1")):
-        print("  Sign-in is off, so anyone who can reach this address can use PeakCut and its AI key.\n"
-              "  On a server other people can reach, set PEAKCUT_ACCOUNTS=1 in .env.\n", flush=True)
-    if config.env("PEAKCUT_AUTO_RELOAD") == "1":
+        print("  Sign-in is off, so anyone who can reach this address can use Instant and its AI key.\n"
+              "  On a server other people can reach, set CUTCUT_ACCOUNTS=1 in .env.\n", flush=True)
+    if config.env("CUTCUT_AUTO_RELOAD") == "1":
         # restart by itself whenever the server code changes (pages in web/ never need a restart)
         uvicorn.run("studio.server:app", host=config.HOST, port=config.PORT, log_level="warning", backlog=4096, reload=True,
                     reload_dirs=[str(config.ROOT / "studio")], reload_includes=["*.py"],
-                    proxy_headers=bool(config.env("PEAKCUT_TRUST_PROXY")), forwarded_allow_ips="*")
+                    proxy_headers=bool(config.env("CUTCUT_TRUST_PROXY")), forwarded_allow_ips="*")
         return
     uvicorn.run(app, host=config.HOST, port=config.PORT, log_level="warning", backlog=4096,
-                proxy_headers=bool(config.env("PEAKCUT_TRUST_PROXY")), forwarded_allow_ips="*")
+                proxy_headers=bool(config.env("CUTCUT_TRUST_PROXY")), forwarded_allow_ips="*")
 
 
 if __name__ == "__main__":

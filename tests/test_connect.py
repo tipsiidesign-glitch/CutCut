@@ -2,10 +2,10 @@
 stand-ins answering the way their documentation says, so nothing leaves this machine."""
 import json, os, sys, tempfile, time
 from urllib.parse import parse_qs, urlparse
-os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-connect-")
-os.environ.update(DATABASE_URL="", PEAKCUT_ACCOUNTS="1", PEAKCUT_PUBLIC_URL="https://clips.example.com", PEAKCUT_VERIFY_EMAIL="0",
-                  GOOGLE_CLIENT_ID="", GOOGLE_CLIENT_SECRET="", GOOGLE_CLIENT_FILE="", PEAKCUT_IG_APP_ID="", PEAKCUT_IG_APP_SECRET="",
-                  PEAKCUT_TIKTOK_CLIENT_KEY="", PEAKCUT_TIKTOK_CLIENT_SECRET="")
+os.environ["CUTCUT_DATA"] = tempfile.mkdtemp(prefix="pc-connect-")
+os.environ.update(DATABASE_URL="", CUTCUT_ACCOUNTS="1", CUTCUT_PUBLIC_URL="https://clips.example.com", CUTCUT_VERIFY_EMAIL="0",
+                  GOOGLE_CLIENT_ID="", GOOGLE_CLIENT_SECRET="", GOOGLE_CLIENT_FILE="", CUTCUT_IG_APP_ID="", CUTCUT_IG_APP_SECRET="",
+                  CUTCUT_TIKTOK_CLIENT_KEY="", CUTCUT_TIKTOK_CLIENT_SECRET="")
 sys.path.insert(0, ".")
 from pathlib import Path
 import sqlalchemy as sa
@@ -188,5 +188,5 @@ with ctx.as_user(user.id):
     check("TikTok: an old sign-in is renewed, and the new refresh token kept", accounts.get(ttacc["id"])["refresh_token"], "tt-refresh-2")
 
 print("ALL PASSED" if not fails else f"{len(fails)} failed")
-import shutil; db.engine.dispose(); shutil.rmtree(os.environ["PEAKCUT_DATA"], ignore_errors=True)
+import shutil; db.engine.dispose(); shutil.rmtree(os.environ["CUTCUT_DATA"], ignore_errors=True)
 sys.exit(1 if fails else 0)

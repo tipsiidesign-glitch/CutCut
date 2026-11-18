@@ -33,7 +33,7 @@ def rejects_caption_value(call):
 
 
 def main(data):
-    os.environ.update(PEAKCUT_DATA=data, DATABASE_URL="", PEAKCUT_ACCOUNTS="0")
+    os.environ.update(CUTCUT_DATA=data, DATABASE_URL="", CUTCUT_ACCOUNTS="0")
     from studio import auth, brain, creators, ctx, db, jobs, render, roman, server
 
     db.init()

@@ -1,11 +1,11 @@
-"""No limits by default on your own PeakCut: many recordings at once (each kept with its own creator), five videos
+"""No limits by default on your own Instant: many recordings at once (each kept with its own creator), five videos
 at once, any number of creators. Runs against the code directly, with its own empty data folder."""
 import os, sys, tempfile
-os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-lim-")
-for k in ("PEAKCUT_MAX_LIVE_PER_USER", "PEAKCUT_MAX_JOBS_PER_USER", "PEAKCUT_MAX_UPLOAD_MB", "PEAKCUT_MAX_VIDEO_HOURS",
-          "PEAKCUT_MAX_LIVE_HOURS", "PEAKCUT_MAX_USER_GB", "PEAKCUT_MAX_CREATORS"):
+os.environ["CUTCUT_DATA"] = tempfile.mkdtemp(prefix="pc-lim-")
+for k in ("CUTCUT_MAX_LIVE_PER_USER", "CUTCUT_MAX_JOBS_PER_USER", "CUTCUT_MAX_UPLOAD_MB", "CUTCUT_MAX_VIDEO_HOURS",
+          "CUTCUT_MAX_LIVE_HOURS", "CUTCUT_MAX_USER_GB", "CUTCUT_MAX_CREATORS"):
     os.environ.pop(k, None)
-os.environ.update(DATABASE_URL="", PEAKCUT_MAX_LIVE="20")
+os.environ.update(DATABASE_URL="", CUTCUT_MAX_LIVE="20")
 sys.path.insert(0, ".")
 from studio import auth, config, creators, ctx, db, live, load
 db.init()
@@ -39,5 +39,5 @@ with ctx.as_user(u.id):
     check("the same creator is not recorded twice at once", "already being recorded" in again, True)
 
 print("ALL PASSED" if not fails else f"{len(fails)} failed")
-import shutil; db.engine.dispose(); shutil.rmtree(os.environ["PEAKCUT_DATA"], ignore_errors=True)
+import shutil; db.engine.dispose(); shutil.rmtree(os.environ["CUTCUT_DATA"], ignore_errors=True)
 sys.exit(1 if fails else 0)

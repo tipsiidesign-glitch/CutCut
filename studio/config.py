@@ -20,7 +20,17 @@ def _load_dotenv():
 
 
 _load_dotenv()
-env = os.environ.get
+
+def env(name, default=None):
+    """Read CutCut settings first, falling back to legacy PeakCut names."""
+    value = os.environ.get(name)
+    if value is not None:
+        return value
+    if name.startswith("CUTCUT_"):
+        value = os.environ.get("PEAKCUT_" + name[len("CUTCUT_"):])
+        if value is not None:
+            return value
+    return default
 
 
 _kept: dict = {}
@@ -52,9 +62,9 @@ def _read_secret(var: str, file_var: str, pattern: str) -> str:
 
 
 # ---------------------------------------------------------------- where things live
-# Everything PeakCut keeps is in one folder. Which one: PEAKCUT_DATA in .env if it is set; otherwise the folder the
-# owner chose in Settings, Storage (kept in storage.json); otherwise "data" inside PeakCut's own folder.
-STORAGE_FILE = Path(env("PEAKCUT_STORAGE_FILE") or ROOT / "storage.json")
+# Everything Instant keeps is in one folder. Which one: CUTCUT_DATA in .env if it is set; otherwise the folder the
+# owner chose in Settings, Storage (kept in storage.json); otherwise "data" inside Instant's own folder.
+STORAGE_FILE = Path(env("CUTCUT_STORAGE_FILE") or ROOT / "storage.json")
 
 
 def _move_folder(old: Path, new: Path) -> bool:
@@ -65,7 +75,7 @@ def _move_folder(old: Path, new: Path) -> bool:
         return True
     items = list(old.iterdir())
     if items:
-        print(f"\n  Moving PeakCut's folder to {new} ({len(items)} things). This is done once and can take a while...", flush=True)
+        print(f"\n  Moving Instant's folder to {new} ({len(items)} things). This is done once and can take a while...", flush=True)
     done = True
     for item in items:
         target = new / item.name
@@ -95,8 +105,8 @@ def _move_folder(old: Path, new: Path) -> bool:
 
 
 def _data_folder():
-    if env("PEAKCUT_DATA"):
-        return Path(env("PEAKCUT_DATA")), "env"
+    if env("CUTCUT_DATA"):
+        return Path(env("CUTCUT_DATA")), "env"
     try:
         chosen = json.loads(STORAGE_FILE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -107,9 +117,9 @@ def _data_folder():
     try:
         new.mkdir(parents=True, exist_ok=True)
     except OSError:
-        raise SystemExit(f"\n  PeakCut's folder is set to {new}, and that can't be reached right now.\n"
-                         f"  Connect that drive and start PeakCut again, or delete {STORAGE_FILE} to go back to the\n"
-                         f"  folder inside PeakCut (your videos and clips stay where they are).\n")
+        raise SystemExit(f"\n  Instant's folder is set to {new}, and that can't be reached right now.\n"
+                         f"  Connect that drive and start Instant again, or delete {STORAGE_FILE} to go back to the\n"
+                         f"  folder inside Instant (your videos and clips stay where they are).\n")
     if chosen.get("move_from"):
         if _move_folder(Path(chosen["move_from"]), new):
             STORAGE_FILE.write_text(json.dumps({"path": str(new)}, indent=1), encoding="utf-8")
@@ -118,26 +128,26 @@ def _data_folder():
 
 DATA_DIR, DATA_FROM = _data_folder()
 USERS_DIR = DATA_DIR / "users"          # users/<user id>/{creators,jobs,accounts}
-MODELS_DIR = Path(env("PEAKCUT_MODELS") or DATA_DIR / "models")
+MODELS_DIR = Path(env("CUTCUT_MODELS") or DATA_DIR / "models")
 TMP_DIR = DATA_DIR / "tmp"
 FONTS_DIR = DATA_DIR / "fonts"          # caption fonts, copied from studio/fonts so every server renders the same
 # YouTube already has a word-by-word transcript of most videos. With this on, that is what the AI reads to find the
 # clips (seconds instead of transcribing hours), and our own model is run only on the clips themselves.
-YT_TRANSCRIPT = env("PEAKCUT_YT_TRANSCRIPT", "1") != "0"
-# the compact model for processors; a machine with a graphics card sets PEAKCUT_ASR_MODEL to the full-precision one
-ASR_MODEL_NAME = env("PEAKCUT_ASR_MODEL", "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8")
+YT_TRANSCRIPT = env("CUTCUT_YT_TRANSCRIPT", "1") != "0"
+# the compact model for processors; a machine with a graphics card sets CUTCUT_ASR_MODEL to the full-precision one
+ASR_MODEL_NAME = env("CUTCUT_ASR_MODEL", "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8")
 ASR_MODEL_DIR = MODELS_DIR / ASR_MODEL_NAME
-DATABASE_URL = env("DATABASE_URL") or f"sqlite:///{(DATA_DIR / 'peakcut.db').as_posix()}"
+DATABASE_URL = env("DATABASE_URL") or f"sqlite:///{(DATA_DIR / 'instant.db').as_posix()}"
 # Commercials and "be right back" screens are stitched into streams. A clip taken from one is worthless, so those
 # seconds can be found and left out. It is off by default: it reads the whole video once, which is not free, and
-# a video that is meant to be still must not lose its clips. PEAKCUT_SKIP_STATIC=1 turns it on.
+# a video that is meant to be still must not lose its clips. CUTCUT_SKIP_STATIC=1 turns it on.
 # The threshold is the mean luma difference between frames: under it, nothing moved.
-SKIP_STATIC = env("PEAKCUT_SKIP_STATIC", "0") == "1"
-STATIC_THRESHOLD = float(env("PEAKCUT_STATIC_THRESHOLD", "0.4"))
-STATIC_MIN_SECONDS = float(env("PEAKCUT_STATIC_MIN_SECONDS", "6"))
+SKIP_STATIC = env("CUTCUT_SKIP_STATIC", "0") == "1"
+STATIC_THRESHOLD = float(env("CUTCUT_STATIC_THRESHOLD", "0.4"))
+STATIC_MIN_SECONDS = float(env("CUTCUT_STATIC_MIN_SECONDS", "6"))
 # How long one AI answer may take on a live stream. It is short on purpose: while the AI thinks, the
 # recording carries on, so a slow answer costs a check, not the stream.
-LIVE_AI_TIMEOUT = float(env("PEAKCUT_LIVE_AI_TIMEOUT", "45"))
+LIVE_AI_TIMEOUT = float(env("CUTCUT_LIVE_AI_TIMEOUT", "45"))
 
 for d in (USERS_DIR, MODELS_DIR, TMP_DIR, FONTS_DIR):
     d.mkdir(parents=True, exist_ok=True)
@@ -150,22 +160,22 @@ def user_dir(uid: str) -> Path:
 
 
 # ---------------------------------------------------------------- the site
-HOST = env("PEAKCUT_HOST", "127.0.0.1")
-PORT = int(env("PEAKCUT_PORT") or "8765")
-PUBLIC_URL = (env("PEAKCUT_PUBLIC_URL") or f"http://127.0.0.1:{PORT}").rstrip("/")   # e.g. https://peakcut.com
+HOST = env("CUTCUT_HOST", "127.0.0.1")
+PORT = int(env("CUTCUT_PORT") or "8765")
+PUBLIC_URL = (env("CUTCUT_PUBLIC_URL") or f"http://127.0.0.1:{PORT}").rstrip("/")   # e.g. https://instant.com
 HTTPS = PUBLIC_URL.startswith("https://")
-SESSION_DAYS = int(env("PEAKCUT_SESSION_DAYS", "30"))
-# Accounts are off by default: PeakCut opens straight into the dashboard, with no sign-in, which is what you want
-# on your own computer. On a server that other people can reach, set PEAKCUT_ACCOUNTS=1: everyone then signs up
+SESSION_DAYS = int(env("CUTCUT_SESSION_DAYS", "30"))
+# Accounts are off by default: Instant opens straight into the dashboard, with no sign-in, which is what you want
+# on your own computer. On a server that other people can reach, set CUTCUT_ACCOUNTS=1: everyone then signs up
 # and signs in, and each person only sees their own videos.
-ACCOUNTS = env("PEAKCUT_ACCOUNTS", "0") == "1"
-# The two buttons along the top of the dashboard: the project's code, and where to follow its maker (feedback goes
+ACCOUNTS = env("CUTCUT_ACCOUNTS", "0") == "1"
+# The two buttons along the top of the dashboard: the project's code, and where to follow the CutCut creator (feedback goes
 # there too). Set either to an empty value to hide that button, or point them at your own pages in a fork.
-REPO_URL = env("PEAKCUT_REPO_URL", "https://github.com/haziqahmedqasmi/peakcut").strip()
-FOLLOW_URL = env("PEAKCUT_FOLLOW_URL", "https://www.instagram.com/haziq.builds/").strip()
+REPO_URL = env("CUTCUT_REPO_URL", "").strip()
+FOLLOW_URL = env("CUTCUT_FOLLOW_URL", "https://www.instagram.com/tipsiix.ai/").strip()
 
 # ---------------------------------------------------------------- limits (per user, and for the whole server)
-# Your own PeakCut has no limits unless you set them: 0 (the default) means "none" for every limit below. The
+# Your own Instant has no limits unless you set them: 0 (the default) means "none" for every limit below. The
 # machine still protects itself: new work waits while the processor, memory or disk are nearly full (load.py).
 _NONE = 10 ** 7                      # what "no limit" becomes: far beyond anything real, and still a plain number
 
@@ -175,31 +185,31 @@ def _limit(name: str, default: str = "0"):
     return _NONE if v <= 0 else v
 
 
-MAX_UPLOAD_MB = int(_limit("PEAKCUT_MAX_UPLOAD_MB"))              # the largest video file someone may upload
+MAX_UPLOAD_MB = int(_limit("CUTCUT_MAX_UPLOAD_MB"))              # the largest video file someone may upload
 # A big file is sent in pieces of this size and joined here, because web servers and CDNs in front of the app
 # refuse very large single requests (Cloudflare stops at 100 MB).
-UPLOAD_PART_MB = max(5, int(env("PEAKCUT_UPLOAD_PART_MB", "40")))
+UPLOAD_PART_MB = max(5, int(env("CUTCUT_UPLOAD_PART_MB", "40")))
 # The most videos that may ever run at once. How many actually run is decided by how busy the machine is (load.py).
-JOB_WORKERS = int(env("PEAKCUT_JOB_WORKERS") or max(2, os.cpu_count() or 4))
-MAX_ACTIVE_JOBS_PER_USER = int(_limit("PEAKCUT_MAX_JOBS_PER_USER", "5"))    # videos sent and worked on at once
-MAX_LIVE_TOTAL = int(env("PEAKCUT_MAX_LIVE") or max(4, 2 * (os.cpu_count() or 4)))   # ceiling; real load decides below it
-MAX_LIVE_PER_USER = int(_limit("PEAKCUT_MAX_LIVE_PER_USER"))     # streams one person records at once
-MAX_VIDEO_HOURS = _limit("PEAKCUT_MAX_VIDEO_HOURS")              # longest video (or chosen part of one) that is processed
-MAX_LIVE_HOURS = _limit("PEAKCUT_MAX_LIVE_HOURS")                # a recording stops by itself after this long
-MAX_USER_GB = _limit("PEAKCUT_MAX_USER_GB")                      # disk space one account may fill
-MAX_CREATORS = int(_limit("PEAKCUT_MAX_CREATORS"))               # creators one account may add
+JOB_WORKERS = int(env("CUTCUT_JOB_WORKERS") or max(2, os.cpu_count() or 4))
+MAX_ACTIVE_JOBS_PER_USER = int(_limit("CUTCUT_MAX_JOBS_PER_USER", "5"))    # videos sent and worked on at once
+MAX_LIVE_TOTAL = int(env("CUTCUT_MAX_LIVE") or max(4, 2 * (os.cpu_count() or 4)))   # ceiling; real load decides below it
+MAX_LIVE_PER_USER = int(_limit("CUTCUT_MAX_LIVE_PER_USER"))     # streams one person records at once
+MAX_VIDEO_HOURS = _limit("CUTCUT_MAX_VIDEO_HOURS")              # longest video (or chosen part of one) that is processed
+MAX_LIVE_HOURS = _limit("CUTCUT_MAX_LIVE_HOURS")                # a recording stops by itself after this long
+MAX_USER_GB = _limit("CUTCUT_MAX_USER_GB")                      # disk space one account may fill
+MAX_CREATORS = int(_limit("CUTCUT_MAX_CREATORS"))               # creators one account may add
 ALLOWED_SITES = tuple(s.strip().lower() for s in env(
-    "PEAKCUT_ALLOWED_SITES", "youtube.com,youtu.be,twitch.tv,kick.com").split(",") if s.strip())
+    "CUTCUT_ALLOWED_SITES", "youtube.com,youtu.be,twitch.tv,kick.com").split(",") if s.strip())
 
 # ---------------------------------------------------------------- AI (bring your own key: see studio/ai.py)
 # These are the starting values. Whatever is saved from the dashboard (Settings, AI) is used instead.
-AI_PROVIDER = env("PEAKCUT_AI_PROVIDER", "gemini").strip().lower()            # gemini, openai, xai, groq, openrouter, anthropic, ollama, custom
-AI_MODELS = [m.strip() for m in env("PEAKCUT_AI_MODELS", "").split(",") if m.strip()]   # tried in this order
-AI_BASE_URL = env("PEAKCUT_AI_BASE_URL", "").rstrip("/")                      # only for "custom", or to override a provider's address
+AI_PROVIDER = env("CUTCUT_AI_PROVIDER", "gemini").strip().lower()       # gemini, openai, xai, groq, openrouter, anthropic, custom
+AI_MODELS = [m.strip() for m in env("CUTCUT_AI_MODELS", "gemini-2.5-flash").split(",") if m.strip()]   # tried in this order
+AI_BASE_URL = env("CUTCUT_AI_BASE_URL", "").rstrip("/")                      # only for "custom", or to override a provider's address
 
 
 def ai_key() -> str:
-    return _secret("PEAKCUT_AI_KEY", "PEAKCUT_AI_KEY_FILE", r"\S{8,}")
+    return _secret("CUTCUT_AI_KEY", "CUTCUT_AI_KEY_FILE", r"\S{8,}")
 
 
 def ai_ready() -> bool:
@@ -208,19 +218,19 @@ def ai_ready() -> bool:
 
 
 # ---------------------------------------------------------------- account emails (see mailer.py)
-SMTP_HOST = env("PEAKCUT_SMTP_HOST", "")
-SMTP_PORT = int(env("PEAKCUT_SMTP_PORT", "587"))
-SMTP_USER = env("PEAKCUT_SMTP_USER", "")
-MAIL_FROM = env("PEAKCUT_MAIL_FROM", "")
-CONTACT_EMAIL = env("PEAKCUT_CONTACT_EMAIL", "")
-LEGAL_NAME = env("PEAKCUT_LEGAL_NAME", "")            # the business that runs PeakCut, for the legal pages
-LEGAL_COUNTRY = env("PEAKCUT_LEGAL_COUNTRY", "")      # whose law applies, for the terms
+SMTP_HOST = env("CUTCUT_SMTP_HOST", "")
+SMTP_PORT = int(env("CUTCUT_SMTP_PORT", "587"))
+SMTP_USER = env("CUTCUT_SMTP_USER", "")
+MAIL_FROM = env("CUTCUT_MAIL_FROM", "")
+CONTACT_EMAIL = env("CUTCUT_CONTACT_EMAIL", "")
+LEGAL_NAME = env("CUTCUT_LEGAL_NAME", "")            # the business that runs Instant, for the legal pages
+LEGAL_COUNTRY = env("CUTCUT_LEGAL_COUNTRY", "")      # whose law applies, for the terms
 # Set to 1 on a public site with email set up: password sign-ups must then confirm their address before clipping.
-VERIFY_EMAIL = env("PEAKCUT_VERIFY_EMAIL", "0") == "1"
+VERIFY_EMAIL = env("CUTCUT_VERIFY_EMAIL", "0") == "1"
 
 
 def smtp_password() -> str:
-    return _secret("PEAKCUT_SMTP_PASSWORD", "PEAKCUT_SMTP_PASSWORD_FILE", r"\S{4,}")
+    return _secret("CUTCUT_SMTP_PASSWORD", "CUTCUT_SMTP_PASSWORD_FILE", r"\S{4,}")
 
 
 # ---------------------------------------------------------------- Google (sign in with Google, and connecting YouTube)

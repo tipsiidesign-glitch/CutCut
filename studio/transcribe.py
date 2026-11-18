@@ -1,6 +1,6 @@
 """Speech to text with word timestamps, using Parakeet 0.6b through sherpa-onnx.
 
-It runs in one of two places. On this machine's processors (the default), or, when PEAKCUT_ASR_URL is set, on a
+It runs in one of two places. On this machine's processors (the default), or, when CUTCUT_ASR_URL is set, on a
 separate machine with a graphics card (studio/asr_worker.py), which does the same work many times faster. If that
 machine cannot be reached, the pieces are done here instead, so transcription never stops because of it."""
 import os
@@ -18,20 +18,20 @@ _lock = threading.Lock()
 # a big machine busy, and several videos transcribing at once would queue behind each other inside it. On a small
 # machine (under 8 cores) this is still a single copy, as before.
 _CPUS = os.cpu_count() or 4
-PROVIDER = os.environ.get("PEAKCUT_ASR_PROVIDER", "cpu").strip().lower() or "cpu"      # "cuda" on a graphics card
-THREADS = int(os.environ.get("PEAKCUT_ASR_THREADS") or (4 if _CPUS >= 8 else max(2, _CPUS - 2)))
-COPIES = int(os.environ.get("PEAKCUT_ASR_COPIES") or (1 if PROVIDER != "cpu" else max(1, _CPUS // THREADS) if _CPUS >= 8 else 1))
+PROVIDER = config.env("CUTCUT_ASR_PROVIDER", "cpu").strip().lower() or "cpu"      # "cuda" on a graphics card
+THREADS = int(config.env("CUTCUT_ASR_THREADS") or (4 if _CPUS >= 8 else max(2, _CPUS - 2)))
+COPIES = int(config.env("CUTCUT_ASR_COPIES") or (1 if PROVIDER != "cpu" else max(1, _CPUS // THREADS) if _CPUS >= 8 else 1))
 _free: "queue.LifoQueue" = queue.LifoQueue()
 _made = 0
 
 # The machine with the graphics card, if there is one.
-REMOTE = os.environ.get("PEAKCUT_ASR_URL", "").strip().rstrip("/")
-REMOTE_TOKEN = os.environ.get("PEAKCUT_ASR_TOKEN", "").strip()
-REMOTE_BATCH = int(os.environ.get("PEAKCUT_ASR_REMOTE_BATCH", "8"))         # pieces sent together: the card does them at once
-REMOTE_PARALLEL = int(os.environ.get("PEAKCUT_ASR_REMOTE_PARALLEL", "4"))   # pieces of one video worked on at once
+REMOTE = config.env("CUTCUT_ASR_URL", "").strip().rstrip("/")
+REMOTE_TOKEN = config.env("CUTCUT_ASR_TOKEN", "").strip()
+REMOTE_BATCH = int(config.env("CUTCUT_ASR_REMOTE_BATCH", "8"))         # pieces sent together: the card does them at once
+REMOTE_PARALLEL = int(config.env("CUTCUT_ASR_REMOTE_PARALLEL", "4"))   # pieces of one video worked on at once
 # The card has a ceiling: beyond a few requests at once it gets no faster. So only this many are sent to it at a
 # time (all videos together), and the rest is done on this machine's own processors at the same moment: both are used.
-REMOTE_SLOTS = threading.BoundedSemaphore(max(1, int(os.environ.get("PEAKCUT_ASR_REMOTE_INFLIGHT", "6"))))
+REMOTE_SLOTS = threading.BoundedSemaphore(max(1, int(config.env("CUTCUT_ASR_REMOTE_INFLIGHT", "6"))))
 _remote_down_until = 0.0
 
 
@@ -64,10 +64,10 @@ def _sherpa():
 
 
 def _load_sherpa():
-    """On Windows a file whose full path is over 260 characters cannot be loaded, which happens when PeakCut sits in a
+    """On Windows a file whose full path is over 260 characters cannot be loaded, which happens when Instant sits in a
     deep folder ("DLL load failed ... The filename or extension is too long"). Then the library is loaded through
     the folder's short name (C:\\Users\\...\\SITE-P~1), which points at the same files, or else from a copy of it
-    in a short folder (AppData\\Local\\PeakCut\\lib), made once."""
+    in a short folder (AppData\\Local\\Instant\\lib), made once."""
     import sys
     try:
         import sherpa_onnx
@@ -108,7 +108,7 @@ def _load_sherpa():
         if mod:
             return mod
     # A copy of the library in a short folder. Same version check each start, so an update replaces it.
-    base = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "PeakCut" / "lib"
+    base = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "Instant" / "lib"
     stamp = base / "sherpa_onnx.from"
     want = f"{pkg}|{(pkg / '__init__.py').stat().st_mtime_ns}"
     try:
@@ -121,8 +121,8 @@ def _load_sherpa():
             return mod
     except OSError:
         pass
-    raise RuntimeError("PeakCut is in a folder too deep for Windows to load the speech model from. Move the PeakCut "
-                       "folder somewhere short, like C:\\peakcut, and start it again.") from first
+    raise RuntimeError("Instant is in a folder too deep for Windows to load the speech model from. Move the Instant "
+                       "folder somewhere short, like C:\\instant, and start it again.") from first
 
 
 def _new():
@@ -211,7 +211,7 @@ def _chunks(audio: np.ndarray, lo=12.0, hi=24.0):
         pos = cut
 
 
-BATCH = int(os.environ.get("PEAKCUT_ASR_BATCH", "1"))   # pieces decoded together. Measured: no faster on CPU, since
+BATCH = int(config.env("CUTCUT_ASR_BATCH", "1"))   # pieces decoded together. Measured: no faster on CPU, since
 # each piece already uses every core, so one at a time (which also keeps the words exactly as before).
 
 

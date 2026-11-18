@@ -2,7 +2,7 @@
 
     python tests/run.py
 
-Starts PeakCut on a spare port with an empty, temporary data folder, runs the tests against it, then stops it and
+Starts Instant on a spare port with an empty, temporary data folder, runs the tests against it, then stops it and
 deletes the folder. Your real data and your running server are never touched. No AI key is needed: the tests cover accounts, permissions, limits and the queue, not clip quality."""
 import os
 import shutil
@@ -14,20 +14,28 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PORT = int(os.environ.get("PEAKCUT_TEST_PORT", "8799"))
+PORT = int(os.environ.get("CUTCUT_TEST_PORT", "8799"))
 BASE = f"http://127.0.0.1:{PORT}"
+TEST_TEMP_ROOT = Path(os.environ.get("CUTCUT_TEST_TEMP_ROOT", str(ROOT / ".test-temp"))).expanduser().resolve()
 
 
 def main() -> int:
-    data = Path(tempfile.mkdtemp(prefix="peakcut-test-"))
-    env = {**os.environ, "PEAKCUT_DATA": str(data), "PEAKCUT_PORT": str(PORT), "PEAKCUT_PUBLIC_URL": BASE,
-           "PEAKCUT_HOST": "127.0.0.1", "PEAKCUT_AUTO_RELOAD": "0", "DATABASE_URL": "",
-           "PEAKCUT_ACCOUNTS": "1", "PEAKCUT_FETCH_MODEL": "0", "PEAKCUT_UPDATE_CHECK": "0",                   # these tests are about people signing in; tests/test_local.py covers the default
+    # Keep temporary files created by this runner and its child tests on the
+    # selected drive. Windows' default TEMP is often on C:, even when the project
+    # and its data live elsewhere.
+    TEST_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
+    run_temp = Path(tempfile.mkdtemp(prefix="instant-test-run-", dir=TEST_TEMP_ROOT))
+    data = run_temp / "data"
+    data.mkdir()
+    env = {**os.environ, "CUTCUT_DATA": str(data), "CUTCUT_PORT": str(PORT), "CUTCUT_PUBLIC_URL": BASE,
+           "TEMP": str(run_temp), "TMP": str(run_temp), "PYTHONIOENCODING": "utf-8",
+           "CUTCUT_HOST": "127.0.0.1", "CUTCUT_AUTO_RELOAD": "0", "DATABASE_URL": "",
+           "CUTCUT_ACCOUNTS": "1", "CUTCUT_FETCH_MODEL": "0", "CUTCUT_UPDATE_CHECK": "0",                   # these tests are about people signing in; tests/test_local.py covers the default
            # nothing outside this machine is contacted: no AI, no email, no Google sign-in
-           "PEAKCUT_SMTP_HOST": "", "PEAKCUT_VERIFY_EMAIL": "1",   # the tests cover the confirm-your-email rule
+           "CUTCUT_SMTP_HOST": "", "CUTCUT_VERIFY_EMAIL": "1",   # the tests cover the confirm-your-email rule
            "GOOGLE_CLIENT_ID": "", "GOOGLE_CLIENT_SECRET": "", "GOOGLE_CLIENT_FILE": "", "PYTHONUNBUFFERED": "1",
-           "PEAKCUT_AI_KEY": "", "PEAKCUT_AI_KEY_FILE": "", "PEAKCUT_AI_MODELS": "",
-           "PEAKCUT_UPLOAD_PART_MB": "5", "PEAKCUT_MAX_UPLOAD_MB": "64"}
+           "CUTCUT_AI_KEY": "", "CUTCUT_AI_KEY_FILE": "", "CUTCUT_AI_MODELS": "",
+           "CUTCUT_UPLOAD_PART_MB": "5", "CUTCUT_MAX_UPLOAD_MB": "64"}
     log = data / "server.log"
     failed = []
     with log.open("w", encoding="utf-8") as out:
@@ -83,7 +91,9 @@ def main() -> int:
             server.wait(timeout=15)
         except subprocess.TimeoutExpired:
             server.kill()
-        shutil.rmtree(data, ignore_errors=True)
+        # Child tests use TEMP/TMP above, so removing this invocation-owned
+        # folder cleans only artifacts produced by this run.
+        shutil.rmtree(run_temp, ignore_errors=True)
     print("\nFAILED: " + ", ".join(failed) if failed else "\nAll tests passed.")
     return 1 if failed else 0
 

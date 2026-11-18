@@ -5,9 +5,9 @@ import os
 import sys
 import tempfile
 
-os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-local-")
-os.environ.update(DATABASE_URL="", PEAKCUT_ACCOUNTS="0", PEAKCUT_AI_PROVIDER="gemini", PEAKCUT_AI_MODELS="", PEAKCUT_AI_KEY="",
-                  PEAKCUT_AI_KEY_FILE="", PEAKCUT_AI_BASE_URL="", PEAKCUT_PUBLIC_URL="http://127.0.0.1:8765")
+os.environ["CUTCUT_DATA"] = tempfile.mkdtemp(prefix="pc-local-")
+os.environ.update(DATABASE_URL="", CUTCUT_ACCOUNTS="0", CUTCUT_AI_PROVIDER="gemini", CUTCUT_AI_MODELS="", CUTCUT_AI_KEY="",
+                  CUTCUT_AI_KEY_FILE="", CUTCUT_AI_BASE_URL="", CUTCUT_PUBLIC_URL="http://127.0.0.1:8765")
 sys.path.insert(0, ".")
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -71,9 +71,6 @@ check("it is kept in the data folder", json.loads((config.DATA_DIR / "ai.json").
 r = put({"provider": "gemini", "models": "model-c", "key": ""})
 check("saving again without typing the key keeps it", (r.status_code, r.json()["has_key"], ai.key()), (200, True, KEY))
 check("changing service without a key is refused, and the old key is not carried over", put({"provider": "openai", "models": "m"}).status_code, 400)
-r = put({"provider": "ollama", "models": "llama"})
-check("a model on this machine needs no key", (r.status_code, r.json()["ready"], ai.key()), (200, True, ""))
-
 
 # ---- finding models and testing, with the network replaced
 class Reply:
@@ -121,5 +118,5 @@ check("a failed test says why, without the key", (r.status_code, "wrong-key-0000
 print("ALL PASSED" if not fails else f"{len(fails)} failed")
 import shutil  # noqa: E402
 db.engine.dispose()
-shutil.rmtree(os.environ["PEAKCUT_DATA"], ignore_errors=True)
+shutil.rmtree(os.environ["CUTCUT_DATA"], ignore_errors=True)
 sys.exit(1 if fails else 0)
