@@ -638,7 +638,7 @@ dialog::backdrop{background:rgba(14,12,11,.42);animation:fadein .16s ease}
 .pop{position:fixed;z-index:60;left:248px;bottom:12px;width:360px;max-width:calc(100vw - 24px);max-height:min(520px,calc(100vh - 100px));display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;
   opacity:0;transform:translateY(8px);transition:opacity .18s ease,transform .18s ease}
 .pop.open{opacity:1;transform:none}
-@media (max-width:900px){.pop{left:12px!important;bottom:74px!important;z-index:80}}
+@media (max-width:900px){.pop{z-index:90}}
 .pop-head{display:flex;align-items:center;gap:8px;padding:14px 16px 10px}
 .pop-head h3{font-size:15px;color:var(--brand-ink);flex:1}
 .pop-head button{border:0;background:transparent;color:var(--dim);font-size:12px;font-weight:600;cursor:pointer;padding:4px 6px;border-radius:6px}
@@ -813,7 +813,7 @@ dialog[open]{animation:fadein .16s ease}
   .ai-big{font-size:24px}
 }
 </style>
-<link rel="stylesheet" href="/brand/cutcut-workspace.css?v=6">
+<link rel="stylesheet" href="/brand/cutcut-workspace.css?v=7">
 <script>try{document.documentElement.dataset.theme=localStorage.getItem("cutcut_theme")||"dark"}catch{document.documentElement.dataset.theme="dark"}</script>
 </head>
 <body>
@@ -1140,13 +1140,19 @@ const NT_ICON = {live: "radio", clips: "scissors", post: "warn", fail: "warn", a
 const ago = t => { const s = Date.now() / 1000 - t; return s < 60 ? "just now" : s < 3600 ? Math.floor(s / 60) + " min ago" : s < 86400 ? Math.floor(s / 3600) + " h ago" : new Date(t * 1000).toLocaleDateString([], {day: "numeric", month: "short"}); };
 function closePops(except) { ["bellpop", "acctpop"].forEach(id => { const p = $("#" + id); if (p !== except && !p.hidden) { p.classList.remove("open"); setTimeout(() => { if (!p.classList.contains("open")) p.hidden = true; }, 180); } });
   $$('[data-act="acctmenu"]').forEach(b => b.setAttribute("aria-expanded", String(except?.id === "acctpop"))); }
+function positionPop(p, anchor) {
+  const a = anchor?.getBoundingClientRect();
+  if (!a) return;
+  const margin = 12, width = Math.min(p.offsetWidth || 360, innerWidth - margin * 2);
+  const height = Math.min(p.offsetHeight || 180, innerHeight - margin * 2);
+  const left = Math.max(margin, Math.min(a.right - width, innerWidth - width - margin));
+  const below = a.bottom + 8;
+  const top = Math.max(margin, Math.min(below + height <= innerHeight - margin ? below : a.top - height - 8, innerHeight - height - margin));
+  p.style.left = `${left}px`; p.style.top = `${top}px`; p.style.right = "auto"; p.style.bottom = "auto";
+}
 function openPop(p, anchor) {
   closePops(p); p.hidden = false;
-  // beside the sidebar, bottom lined up with the button that opened it
-  const side = $(".side").getBoundingClientRect(), a = anchor?.getBoundingClientRect();
-  if (innerWidth > 900) { p.style.left = side.right + 8 + "px"; p.style.bottom = Math.max(12, innerHeight - (a ? a.bottom + 6 : side.bottom - 12)) + "px"; }
-  else { p.style.left = ""; p.style.bottom = ""; }
-  requestAnimationFrame(() => p.classList.add("open"));
+  requestAnimationFrame(() => { positionPop(p, anchor); p.classList.add("open"); });
 }
 async function openBell() {
   const p = $("#bellpop");
@@ -1159,6 +1165,7 @@ async function openBell() {
       ${d.items.length ? `<div class="pop-list">${d.items.map(n => `<button class="nt k-${esc(n.kind)} ${n.read ? "" : "new"}" data-act="ntgo" data-link="${esc(n.link)}">
         <i>${ic(NT_ICON[n.kind] || "bell")}</i><span class="tx"><b>${esc(n.title)}</b>${n.body ? `<span>${esc(n.body)}</span>` : ""}<small>${ago(n.t)}</small></span></button>`).join("")}</div>`
         : `<div class="pop-empty">${ic("bell")}Nothing yet. Recordings, finished clips and posts that need a look show up here.</div>`}`;
+    requestAnimationFrame(() => positionPop(p, $("[data-act=bell]")));
     if (d.unread) setTimeout(markRead, 1500);
   } catch (e) { p.innerHTML = `<div class="pop-head"><h3>Notifications</h3></div><div class="pop-empty">${esc(e.message)}</div>`; }
 }
@@ -1350,7 +1357,7 @@ function go(v, tab, fromHistory) {
   else if (v === "usage") { view.innerHTML = `<div id="usage"></div>`; loadUsage(); }
   else view.innerHTML = `<div id="stream"></div><div id="cbody"></div>`;   // the live player stays put across tabs: no restart, no rebuffer
   if ($("#add")) drawAdd(v === "overview" ? "hero" : "compact");
-  if (v === "overview" && window.GradientASCII) { try { window._gaStop = GradientASCII($("#appAscii"), {colors: ["#f7b9bf", "#ffffff", "#ffe4e6", "#fff0f1", "#fffafa"], shape: "horizon", lightMode: true, cellSize: 16, density: 0.8, glyphOpacity: 0.26, gradientOpacity: 0.32, glow: 0.06, grain: 0.06, mouseInteraction: false, clickEffect: "none"}); } catch {} }
+  if (v === "overview" && window.GradientASCII) { try { const light = document.documentElement.dataset.theme === "light"; window._gaStop = GradientASCII($("#appAscii"), {colors: light ? ["#f7b9bf", "#ffffff", "#ffe4e6", "#fff0f1", "#fffafa"] : ["#260d13", "#641923", "#f04452", "#171219", "#0b0b0f"], shape: "horizon", lightMode: light, cellSize: 16, density: 0.8, glyphOpacity: 0.22, gradientOpacity: 0.26, glow: 0.04, grain: 0.04, mouseInteraction: false, clickEffect: "none"}); } catch {} }
   if (v === "settings") drawSettings();
   if (v === "autopilot") drawAutopilot();
   if (v.startsWith("c:")) setTab(S.ctab);
